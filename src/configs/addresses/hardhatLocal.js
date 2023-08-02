@@ -1,0 +1,7 @@
+const HardhatLocalAddresses = {
+  FUND_MANAGER: "0x8864267084CA3B080e9087EB5C8c7F8d552099a5",
+  DAO_MANAGER: "0x802eC44fA784F2bac33725729AF22b07EEAddeF0",
+  DKG: "0xFc4e5fa9baA08675b1C621b3A2Fe866a8dcd1B02",
+};
+
+export default HardhatLocalAddresses;
