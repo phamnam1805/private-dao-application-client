@@ -27,14 +27,6 @@ export default class FundManagerContract {
     return await this.contract.methods.requests(requestID).call();
   }
 
-  async launchFundingRound(distributedKeyID, accountAddress) {
-    return await this.contract.methods.launchFundingRound(distributedKeyID).send({ from: accountAddress });
-  }
-
-  async fund(fundingRoundID, commitment, R, M, proof, accountAddress) {
-    return await this.contract.methods.fund(fundingRoundID, commitment, R, M, proof).send({ from: accountAddress });
-  }
-
   async startTallying(fundingRoundID, accountAddress) {
     return await this.contract.methods.startTallying(fundingRoundID).send({ from: accountAddress });
   }
@@ -43,7 +35,15 @@ export default class FundManagerContract {
     return await this.contract.methods.finalizeFundingRound(fundingRoundID).send({ from: accountAddress });
   }
 
-  async refund(fundingRoundID, accountAddress) {
-    return await this.contract.methods.refund(fundingRoundID).send({ from: accountAddress });
+  launchFundingRound(distributedKeyID, accountAddress) {
+    return this.contract.methods.launchFundingRound(distributedKeyID).send({ from: accountAddress });
+  }
+
+  fund(fundingRoundID, commitment, R, M, proof, accountAddress, value) {
+    return this.contract.methods.fund(fundingRoundID, commitment, R, M, proof).send({ from: accountAddress, value: value });
+  }
+
+  refund(fundingRoundID, accountAddress) {
+    return this.contract.methods.refund(fundingRoundID).send({ from: accountAddress });
   }
 }

@@ -1,6 +1,9 @@
 import {
   Box,
   Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Table,
   TableBody,
   TableContainer,
@@ -10,27 +13,111 @@ import {
   Typography,
   makeStyles,
 } from "@material-ui/core";
-import { useMemo, useState } from "react";
-import { useSelector } from "react-redux";
+import { useSnackbar } from "notistack";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import useNotify from "src/hook/useNotify";
+import DKGContract from "src/contract/DKGContract";
+import { web3Reader, web3Sender } from "src/wallet-connection";
+import { BASE_FUNDING, KEY_REQUEST_STATE, KEY_REQUEST_STATE_ALIAS, THEME_MODE } from "src/configs/constance";
+import { fetchAccountData, saveContributionData } from "src/redux/accountDataSlice";
+import { fetchKeysData } from "src/redux/dkgDataSlice";
+import { formatAddress, parseBigIntObject } from "src/services/utility";
+import CopyIcon from "src/components/Icon/CopyIcon";
 import Empty from "src/components/Icon/Empty";
 import ErrorIconBox from "src/components/Icon/ErrorIconBox";
 import { LoadingIconBox } from "src/components/Icon/LoadingIcon";
-import { QUERY_STATE, KEY_REQUEST_STATE, KEY_REQUEST_STATE_ALIAS } from "src/configs/constance";
-import { formatAddress } from "src/services/utility";
-import ArrowAnimationIcon from "src/components/Icon/ArrowAnimationIcon";
-import CopyIcon from "src/components/Icon/CopyIcon";
+import { bruteForceResult, generateTallyContribution, generateResultSubmission } from "../Contributions";
 
-const useStyle = makeStyles((theme) => ({}));
+const useStyle = makeStyles((theme) => ({
+  title: {
+    padding: "10px 20px 10px 20px",
+    background: theme.palette.type === THEME_MODE.DARK ? "#4D2900" : "#F2F5F2",
+  },
+  listItem: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    padding: theme.spacing(2),
+    borderRadius: 10,
+  },
+  image: {
+    height: 60,
+    width: 60,
+    objectFit: "contain",
+  },
+  chooseText: {
+    color: theme.palette.text.hint,
+    padding: "0rem 0rem 0.5rem 0rem",
+  },
+}));
+
+function ResultModalDialog({ open, onClose, resultVector }) {
+  const cls = useStyle();
+  return (
+    <Dialog open={open} onClose={onClose} PaperProps={{ style: { padding: 0, maxWidth: 600 } }}>
+      <DialogTitle className={cls.title}>
+        <Box textAlign="center">
+          <Typography variant="h4" className={cls.chooseText}>
+            Result Vector
+          </Typography>
+        </Box>
+      </DialogTitle>
+      <DialogContent>
+        {resultVector.map((res, index) => (
+          <>
+            <Box mt={2} key={`result-${index}-title`}>
+              <Typography color="textPrimary" style={{ fontSize: "16px", fontWeight: "500" }}>
+                {`Dimension ${index}:`}
+              </Typography>
+            </Box>
+
+            <Box mt={2} sx={{ display: "flex", width: "100%" }} key={`result-${index}-0`}>
+              <Typography color="textPrimary" style={{ fontSize: "14px", fontWeight: "400" }}>
+                {"X: "}
+              </Typography>
+              <Typography color="textSecondary" style={{
+                width: "100%",
+                fontSize: "14px",
+                fontWeight: "400",
+                wordWrap: "break-word"
+              }}>
+                {resultVector[index][0]}
+              </Typography>
+            </Box>
+
+            <Box mt={2} sx={{ display: "flex", width: "100%" }} key={`result-${index}-1`}>
+              <Typography color="textPrimary" style={{ fontSize: "14px", fontWeight: "400" }}>
+                {"Y: "}
+              </Typography>
+              <Typography color="textSecondary" style={{
+                width: "100%",
+                fontSize: "14px",
+                fontWeight: "400",
+                wordWrap: "break-word"
+              }}>
+                {resultVector[index][1]}
+              </Typography>
+            </Box>
+          </>
+        ))}
+        <Box ml={-1}>
+          <CopyIcon copyText={`[${[...resultVector.map(e => `[${e.toString()}]`)]}]`} defaultText="Copy result" successText="Copied result!" size="small" />
+        </Box>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function RequestTableHeader() {
   const cls = useStyle();
   const columns = [
-    { id: "requestID", label: "Request ID", classes: cls.cell, style: { minWidth: 60, maxWidth: 70 } },
+    { id: "requestID", label: "ID", classes: cls.cell, style: { minWidth: 60, maxWidth: 70 } },
     { id: "requestor", label: "Requestor", classes: cls.cell, style: { minWidth: 60, maxWidth: 70 } },
-    { id: "keyID", label: "Key ID", classes: cls.firstCell, style: { minWidth: 100, maxWidth: 120 } },
+    { id: "keyID", label: "Key ID", classes: cls.firstCell, style: { minWidth: 80, maxWidth: 100 } },
     { id: "state", label: "Status", classes: cls.cell, style: { minWidth: 100, maxWidth: 120 } },
-    { id: "actions", label: "", classes: cls.cell, style: { minWidth: 200 } },
-    { id: "result", label: "", classes: cls.cell, style: { minWidth: 130 } },
+    { id: "actions", label: "", classes: cls.cell, style: { minWidth: 220 } },
+    { id: "result", label: "", classes: cls.cell, style: { minWidth: 150 } },
   ];
 
   return (
@@ -50,89 +137,196 @@ function RequestTableHeader() {
   );
 }
 
-function RequestTableRow({ request }) {
-  const cls = useStyle();
+function RequestTableRow({ keys, request }) {
+  const dispatch = useDispatch();
+  const { errorNotify } = useNotify();
+  const { enqueueSnackbar } = useSnackbar();
+  const { accountAddress } = useSelector((state) => state.accountDataSlice);
+  const { chainId, addresses } = useSelector((state) => state.configSlice);
+  const { DKG } = addresses;
+  const [isOpenResultModal, setIsOpenResultModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  function onRowClick() {}
+  function onRowClick() { }
+
+  async function onActionClick() {
+    try {
+      setIsLoading(true);
+      // Open modal
+      const dkgReader = new DKGContract(web3Reader, DKG);
+      const dkgSender = new DKGContract(web3Sender, DKG);
+      // const keyData = await dkgReader.distributedKeys(dKey.keyID);
+      let _promise;
+      const keyGenContribution = parseBigIntObject(keys[request.keyID].contributions);
+      if (request.state == KEY_REQUEST_STATE.CONTRIBUTION) {
+        console.log("Submitting tally contribution...");
+        let contribution;
+        // eslint-disable-next-line no-constant-condition
+        if (true) {
+          const generatedData = await generateTallyContribution(
+            keyGenContribution,
+            keys[request.keyID].round2DataSubmissions,
+            request.R
+          );
+          // committeeData = generatedData.committeeData;
+          contribution = generatedData.contribution;
+        } else {
+          // Upload data
+        }
+        _promise = dkgSender.submitTallyContribution(
+          request.requestID,
+          contribution,
+          accountAddress
+        );
+      } else if (request.state == KEY_REQUEST_STATE.RESULT_AWAITING) {
+        console.log("Submitting brute force result...");
+        let submission;
+        // eslint-disable-next-line no-constant-condition
+        if (true) {
+          const result = await bruteForceResult(request.resultVector);
+          const generatedData = await generateResultSubmission(
+            request.tallyDataSubmissions,
+            request.M,
+            result
+          );
+          submission = generatedData.submission;
+        } else {
+          // Upload data
+        }
+        _promise = dkgSender.submitTallyResult(
+          request.requestID,
+          submission.result,
+          submission.proof,
+          accountAddress
+        );
+      }
+
+      // On transactionHash
+      _promise.on("transactionHash", (_) => {
+      });
+      // Then
+      _promise.then(async (receipt) => {
+        if (request.state == KEY_REQUEST_STATE.CONTRIBUTION) {
+          saveContributionData(
+            chainId, request.keyID,
+            keyGenContribution.tally ? {
+              tally: { ...keyGenContribution.tally, ...{ [request.requestID]: true } }
+            } : {
+              tally: { [request.requestID]: true }
+            },
+            accountAddress
+          );
+        }
+        dispatch(fetchKeysData(enqueueSnackbar));
+        dispatch(fetchAccountData(accountAddress, enqueueSnackbar));
+        setIsLoading(false);
+      });
+      // Catch
+      _promise.catch(async (error) => {
+        setIsLoading(false);
+        throw error;
+      });
+    } catch (error) {
+      setIsLoading(false);
+      errorNotify(JSON.stringify(error.message));
+    }
+  }
+
+  async function onResultClick() {
+    setIsOpenResultModal(true);
+  }
 
   return (
-    <TableRow onClick={onRowClick}>
-      <TableCell>
-        <Box display="flex" alignItems="center">
-          <Typography>{formatAddress(request.requestID, 8)}</Typography>
-        </Box>
-      </TableCell>
-      <TableCell>
-        <Box display="flex" alignItems="center">
-          <Typography>{formatAddress(request.requestor, 6)}</Typography>
-        </Box>
-      </TableCell>
-      <TableCell>
-        <Box display="flex" alignItems="center">
-          <Typography>{request.keyID}</Typography>
-        </Box>
-      </TableCell>
-      <TableCell>
-        <Box display="flex" alignItems="center">
-          <Typography>{KEY_REQUEST_STATE_ALIAS[request.state]}</Typography>
-        </Box>
-      </TableCell>
-      <TableCell>
-        {request.state < 2 && (
+    <>
+      <TableRow onClick={onRowClick}>
+        <TableCell>
           <Box display="flex" alignItems="center">
-            <Button variant="outlined" color={"primary"} fullWidth>
-              {request.state == KEY_REQUEST_STATE.CONTRIBUTION && "Submit Contribution"}
-              {request.state == KEY_REQUEST_STATE.RESULT_AWAITING && "Submit Result"}
+            <Typography>{formatAddress(request.requestID, 4)}</Typography>
+          </Box>
+        </TableCell>
+        <TableCell>
+          <Box display="flex" alignItems="center">
+            <Typography>{formatAddress(request.requester, 4)}</Typography>
+          </Box>
+        </TableCell>
+        <TableCell>
+          <Box display="flex" alignItems="center">
+            <Typography>{request.keyID}</Typography>
+          </Box>
+        </TableCell>
+        <TableCell>
+          <Box display="flex" alignItems="center">
+            <Typography>{KEY_REQUEST_STATE_ALIAS[request.state]}</Typography>
+          </Box>
+        </TableCell>
+        <TableCell>
+          {request.state < 2 && (
+            <Box display="flex" alignItems="center">
+              <Button
+                variant="outlined" color={"primary"} fullWidth
+                disabled={
+                  isLoading ||
+                  (
+                    KEY_REQUEST_STATE.CONTRIBUTION &&
+                    keys[request.keyID].contributions &&
+                    parseBigIntObject(keys[request.keyID].contributions).tally &&
+                    parseBigIntObject(keys[request.keyID].contributions).tally[request.requestID]
+                  )
+                }
+                onClick={onActionClick}
+              >
+
+                {isLoading && <LoadingIconBox iconProps={{ sx: { height: 25 } }} />}
+                {!isLoading && request.state == KEY_REQUEST_STATE.CONTRIBUTION && (
+                  (keys[request.keyID].contributions &&
+                    parseBigIntObject(keys[request.keyID].contributions).tally &&
+                    parseBigIntObject(keys[request.keyID].contributions).tally[request.requestID])
+                    ? "Submitted Contribution" : "Submit Contribution"
+                )}
+                {!isLoading && request.state == KEY_REQUEST_STATE.RESULT_AWAITING && "Submit Result"}
+              </Button>
+            </Box>
+          )}
+        </TableCell>
+        <TableCell>
+          <Box display="flex" alignItems="center">
+            <Button
+              variant="contained"
+              color={"secondary"}
+              fullWidth
+              disabled={request.state !== KEY_REQUEST_STATE.RESULT_SUBMITTED}
+              onClick={onResultClick}
+            >
+              View Result
             </Button>
           </Box>
-        )}
-      </TableCell>
-      <TableCell>
-        <Box display="flex" alignItems="center">
-          <Button
-            variant="contained"
-            color={"secondary"}
-            fullWidth
-            disabled={request.state !== KEY_REQUEST_STATE.RESULT_SUBMITTED}
-          >
-            View Result
-          </Button>
-        </Box>
-      </TableCell>
-    </TableRow>
+        </TableCell>
+        <ResultModalDialog open={isOpenResultModal} onClose={() => setIsOpenResultModal(false)} resultVector={request.resultVector} />
+      </TableRow >
+    </>
   );
 }
 
-export default function RequestTable({ requestListData }) {
-  // const { fetchingPortfolioStatus } = useSelector((state) => state.portfolioDataSlice);
-
-  const fetchingRequestsStatus = QUERY_STATE.SUCCESS;
-  const data = requestListData;
-
+export default function RequestTable({ keyListData, requestListData }) {
   return (
     <Box>
       <TableContainer style={{ marginTop: 2, borderRadius: "10px" }}>
         <Table>
           <RequestTableHeader />
-          {fetchingRequestsStatus === QUERY_STATE.SUCCESS && data.length > 0 && (
+          {requestListData.length > 0 && (
             <TableBody>
-              {data.map((requestData, index) => {
-                return <RequestTableRow key={index} request={requestData} />;
+              {[...requestListData].reverse().map((requestData, index) => {
+                return <RequestTableRow key={`request-row-${index}`} keys={keyListData} request={requestData} />;
               })}
             </TableBody>
           )}
         </Table>
       </TableContainer>
-      {(() => {
-        if (fetchingRequestsStatus === QUERY_STATE.SUCCESS && data.length == 0)
-          return (
-            <Box py={2} display="flex" justifyContent="center">
-              <Empty title="No Data" iconProps={{ style: { fontSize: "60px" } }} />
-            </Box>
-          );
-        else if (fetchingRequestsStatus == QUERY_STATE.FETCHING) return <LoadingIconBox mt={2} />;
-        else if (fetchingRequestsStatus == QUERY_STATE.FAIL) return <ErrorIconBox />;
-      })()}
+      {(requestListData.length == 0) && (
+        <Box py={2} display="flex" justifyContent="center">
+          <Empty title="No Data" iconProps={{ style: { fontSize: "60px" } }} />
+        </Box>
+      )}
     </Box>
   );
 }

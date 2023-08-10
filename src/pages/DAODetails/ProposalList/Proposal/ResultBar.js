@@ -1,5 +1,4 @@
 import { Box, LinearProgress, Tooltip } from "@material-ui/core";
-import { compactNumber } from "src/services/utility";
 
 export default function ResultBar({ option, value, ratio }) {
   return (
@@ -7,8 +6,8 @@ export default function ResultBar({ option, value, ratio }) {
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
         <span>
           <span style={{ marginRight: "18px", display: "inline-block", width: "55px" }}>{option}</span>
-          <Tooltip title={Number(value).toFixed(2)} arrow placement="right">
-            <span style={{ fontWeight: "bold" }}>{compactNumber(Math.round(Number(value) || 0), 2)}</span>
+          <Tooltip title={Number(value)} arrow placement="right">
+            <span style={{}}>{value} {value > 0 && "ETH"}</span>
           </Tooltip>
         </span>
         <span>{Math.round(ratio * 100) / 100}%</span>

@@ -67,7 +67,6 @@ export const fetchAccountData = (accountAddress, enqueueSnackbar) =>
       dispatch(fetchingAccountData({}));
       const { chainId } = getState().configSlice;
       const contributions = readContributionsData(chainId, accountAddress);
-      console.log("valid contributions", contributions);
       dispatch(fetchAccountDataSuccess({ contributions }));
     } catch (error) {
       dispatch(fetchAccountDataFail());

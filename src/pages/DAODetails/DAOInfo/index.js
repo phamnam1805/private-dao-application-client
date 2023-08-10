@@ -1,14 +1,16 @@
 import { Box, Grid, Paper, Typography, makeStyles } from "@material-ui/core";
 import CopyIcon from "src/components/Icon/CopyIcon";
 import { formatAddress } from "src/services/utility";
+import Web3 from "web3";
 
 const useStyle = makeStyles((theme) => ({
   infoBox: {
     backgroundColor: theme.palette.background.paper,
+    height: "320px",
   },
   desBox: {
     // display: "flex",
-    minHeight: "300px",
+    height: "320px",
     backgroundColor: theme.palette.background.paper,
   },
   image: {
@@ -57,6 +59,12 @@ export default function DAOInfo({ dao, description = true }) {
           </Box>
           <Box className={cls.info}>
             <Typography color="textSecondary" gutterBottom>
+              Total Funded
+            </Typography>
+            <Typography>{Web3.utils.fromWei(String(dao.totalFunded))} ETH</Typography>
+          </Box>
+          <Box className={cls.info}>
+            <Typography color="textSecondary" gutterBottom>
               Tags
             </Typography>
             <Box className={cls.infoTag}>
@@ -70,7 +78,6 @@ export default function DAOInfo({ dao, description = true }) {
               })}
             </Box>
           </Box>
-
           <Box className={cls.info}>
             <Typography color="textSecondary" gutterBottom>
               Website
@@ -82,10 +89,12 @@ export default function DAOInfo({ dao, description = true }) {
       {description && (
         <Grid item lg={8} sm={7} xs={12}>
           <Paper className={cls.desBox}>
-            <Typography variant="h2" gutterBottom>
-              Description
-            </Typography>
-            <Typography>{dao.description}</Typography>
+            <Box mb={2}>
+              <Typography style={{ fontSize: "28px", fontWeight: "600" }} gutterBottom>{dao.name}</Typography>
+            </Box>
+            <Box mb={2}>
+              <Typography>{dao.description}</Typography>
+            </Box>
           </Paper>
         </Grid>
       )}

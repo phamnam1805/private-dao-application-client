@@ -1,88 +1,100 @@
 import { Avatar, Box, Button, Divider, Grid, Paper, Typography, makeStyles, useMediaQuery } from "@material-ui/core";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useSnackbar } from "notistack";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import useQuery from "src/hook/useUrlQuery";
+import { QUERY_STATE, THEME_MODE } from "src/configs/constance";
+import { fetchAccountData } from "src/redux/accountDataSlice";
+import { fetchDAOData } from "src/redux/daoDataSlice";
+import { fetchFundingRoundsData } from "src/redux/fundingDataSlice";
 import MainLayoutWrapper from "src/components/Wrappers/MainLayoutWrapper";
+import ErrorIconBox from "src/components/Icon/ErrorIconBox";
+import { LoadingIconBox } from "src/components/Icon/LoadingIcon";
 import LatestCampaign from "../Campaigns/LatestCampaign";
 import CampaignList from "../Campaigns/CampaignList";
+import FundingQueue from "../Campaigns/FundingQueue";
+import Empty from "src/components/Icon/Empty";
 
 const useStyle = makeStyles((theme) => ({}));
 
-const daoListData = [
-  {
-    name: "The PAO",
-    address: "0xD5745a490f14CdA24bed11156d91Eb7A77c8CB1B",
-    logoUrl:
-      "https://lh3.googleusercontent.com/u/0/drive-viewer/AITFw-ww9lkjcQGAe9pBTgpxtKx0Af2mZsVDNDGM_PsAoBZHQifZ34fDGptTqex3-gPGxBCPXq11ZOp8rwK-Ncb1eD5CJhr3JQ=w3024-h1666",
-    description:
-      "The protocol addresses the privacy issue for investors, encompassing both the privacy of the amount of money they have invested and the privacy of voting on project operations through proposals.",
-    website: "https://thepao.fund",
-    tags: ["Investment", "Financial"],
-  },
-  {
-    name: "Gitcoin",
-    address: "0xD5745a490f14CdA24bed11156d91Eb7A77c8CB1B",
-    logoUrl: "https://user-images.githubusercontent.com/23297747/40148910-112c56d4-5936-11e8-95df-aa9796b33bf3.png",
-    description:
-      "Gitcoin's mission is to grow and sustain open source development. Gitcoin believes that open source software developers create billions of dollars in value, but don't get to capture that value.",
-    website: "https://gitcoin.co",
-    tags: ["Investment", "Public Goods"],
-  },
-  {
-    name: "Openzeppelin",
-    address: "0xD5745a490f14CdA24bed11156d91Eb7A77c8CB1B",
-    logoUrl: "https://avatars.githubusercontent.com/u/20820676?s=280&v=4",
-    description:
-      "OpenZeppelin provides security products to build, automate, and operate decentralized applications. We also protect leading organizations by performing security audits on their systems and products.",
-    website: "https://www.openzeppelin.com/",
-    tags: ["Programming", "Security"],
-  },
-  {
-    name: "Ethereum Foundation",
-    address: "0xD5745a490f14CdA24bed11156d91Eb7A77c8CB1B",
-    logoUrl: "https://cdn4.iconfinder.com/data/icons/logos-brands-5/24/ethereum-512.png",
-    description:
-      "Fugiat laborum incididunt officia quis nisi irure. Eiusmod reprehenderit qui laboris voluptate quis laborum eu cupidatat ut qui sit do esse consectetur. Est nulla nulla excepteur magna proident magna sunt esse magna aliquip dolor duis. Dolore pariatur velit nulla proident dolor.",
-    website: "https://google.com",
-    tags: ["Education", "Society"],
-  },
-  {
-    name: "zkSync",
-    address: "0xD5745a490f14CdA24bed11156d91Eb7A77c8CB1B",
-    logoUrl:
-      "https://img.evbuc.com/https%3A%2F%2Fcdn.evbuc.com%2Fimages%2F451300809%2F1144705849263%2F1%2Foriginal.20230221-185620?w=400&auto=format%2Ccompress&q=75&sharp=10&rect=0%2C0%2C400%2C400&s=6be70815fc7d7b0da0ed6d53c81cdd68",
-    description:
-      "Fugiat laborum incididunt officia quis nisi irure. Eiusmod reprehenderit qui laboris voluptate quis laborum eu cupidatat ut qui sit do esse consectetur. Est nulla nulla excepteur magna proident magna sunt esse magna aliquip dolor duis. Dolore pariatur velit nulla proident dolor.",
-    website: "https://google.com",
-    tags: ["Investment", "Profit"],
-  },
-  {
-    name: "Polygon",
-    address: "0xD5745a490f14CdA24bed11156d91Eb7A77c8CB1B",
-    logoUrl: "https://seeklogo.com/images/P/polygon-matic-logo-1DFDA3A3A8-seeklogo.com.png",
-    description:
-      "Fugiat laborum incididunt officia quis nisi irure. Eiusmod reprehenderit qui laboris voluptate quis laborum eu cupidatat ut qui sit do esse consectetur. Est nulla nulla excepteur magna proident magna sunt esse magna aliquip dolor duis. Dolore pariatur velit nulla proident dolor.",
-    website: "https://google.com",
-    tags: ["Science", "Research"],
-  },
-];
+export function InvestmentDashboardLayout() {
+  const query = useQuery();
+  const dispatch = useDispatch();
+  const { enqueueSnackbar } = useSnackbar();
+  const { accountAddress } = useSelector((state) => state.accountDataSlice);
+  const { fetchingDAOsStatus, daos } = useSelector((state) => state.daoDataSlice);
+  const { fetchingFundingRoundsStatus, funding } = useSelector((state) => state.fundingDataSlice);
+  const { fetchingAccountStatus } = useSelector((state => state.accountDataSlice));
 
-const campaignListData = [
-  {
-    id: 0,
-    state: 4,
-    listDAO: [
-      "0x0E80c0aB999228caB1f77b8714dB10d22C8D9eC8",
-      "0x12928f95333A486E5E6eCf52ea28245571423b13",
-      "0x1AD841EA7A95C2Fd3BBA0812E538E9061A9F743b",
-    ],
-    result: [2000, 4000, 5000],
-    totalFunded: 11000,
-    launchedAt: 1690129908000,
-    finalizedAt: 1690129908000,
-    failedAt: 1690129908000,
-  },
-];
+  useEffect(() => {
+    if (fetchingAccountStatus === QUERY_STATE.INITIAL && accountAddress) dispatch(fetchAccountData(accountAddress, enqueueSnackbar));
+  }, [accountAddress, fetchingAccountStatus]);
+
+  useEffect(() => {
+    if (fetchingDAOsStatus === QUERY_STATE.INITIAL) dispatch(fetchDAOData(enqueueSnackbar));
+  }, [fetchingDAOsStatus]);
+
+  useEffect(() => {
+    if (fetchingFundingRoundsStatus === QUERY_STATE.INITIAL) dispatch(fetchFundingRoundsData(enqueueSnackbar));
+  }, [fetchingFundingRoundsStatus]);
+
+  const daoListData = useMemo(() => {
+    if (fetchingAccountStatus === QUERY_STATE.SUCCESS && fetchingDAOsStatus === QUERY_STATE.SUCCESS && fetchingFundingRoundsStatus === QUERY_STATE.SUCCESS && funding) {
+      return {
+        active: Object.values(daos).map((dao) => {
+          if (funding.currentRound === null) return null;
+          if (!funding.currentRound.listDAO.includes(dao.address.toLowerCase())) return null;
+          else return dao;
+        }).filter(e => e !== null),
+        queued: Object.values(daos).map((dao) => {
+          if (funding.queue.length > 0 && funding.queue.includes(dao.address.toLowerCase())) return dao;
+          else return null;
+        }).filter(e => e !== null),
+      };
+    } else return [];
+  }, [fetchingAccountStatus, fetchingDAOsStatus, fetchingAccountStatus, daos, funding]);
+
+  return (
+    <>
+      {(fetchingFundingRoundsStatus === QUERY_STATE.FETCHING || fetchingDAOsStatus === QUERY_STATE.FETCHING || fetchingAccountStatus === QUERY_STATE.FETCHING) && <LoadingIconBox />}
+      {(fetchingFundingRoundsStatus === QUERY_STATE.FAIL || fetchingDAOsStatus === QUERY_STATE.FAIL || fetchingAccountStatus === QUERY_STATE.FAIL) && <ErrorIconBox des="Something wrong!" />}
+      {(fetchingFundingRoundsStatus === QUERY_STATE.SUCCESS && fetchingDAOsStatus === QUERY_STATE.SUCCESS && fetchingAccountStatus === QUERY_STATE.SUCCESS) && (
+        <>
+          <Box mb={2}>
+            {
+              daoListData.active.length == 0 ?
+                (<FundingQueue daos={daoListData.queued} />) :
+                <LatestCampaign
+                  daos={daoListData.active}
+                  fundingRound={{
+                    ...funding.currentRound,
+                    ...{ config: funding.config }
+                  }}
+                  selectedIndex={funding.currentRound.listDAO.findIndex(e => e == query.get("addr")) ?? 0}
+                />
+            }
+
+          </Box>
+          <Box mt={5} mb={2}>
+            <Typography variant="h2">Previous Funding Rounds</Typography>
+          </Box>
+          <Box mb={2}>
+            {funding.oldRounds ? <CampaignList campaigns={funding.oldRounds} /> : (
+              <Box py={2} display="flex" justifyContent="center">
+                <Empty title="No Data" iconProps={{ style: { fontSize: "60px" } }} />
+              </Box>
+            )}
+
+          </Box>
+        </>
+      )}
+    </>
+  );
+}
 
 export default function Dashboard() {
+
+
   return (
     <MainLayoutWrapper
       overview={{
@@ -90,18 +102,7 @@ export default function Dashboard() {
         des: "Explore investment opportunities in the latest campaign and checkout previously funded projects.",
       }}
     >
-      <Box mb={2}>
-        <Typography variant="h2">Latest Funding Round</Typography>
-      </Box>
-      <Box mb={2}>
-        <LatestCampaign daos={daoListData} />
-      </Box>
-      <Box mb={2}>
-        <Typography variant="h2">Previous Funding Rounds</Typography>
-      </Box>
-      <Box mb={2}>
-        <CampaignList campaigns={campaignListData} />
-      </Box>
+      <InvestmentDashboardLayout />
     </MainLayoutWrapper>
   );
 }

@@ -10,7 +10,7 @@ const useStyle = makeStyles((theme) => ({
   },
   daoList: {
     // display: "block",
-    height: "270px",
+    height: "288px",
     overflowY: "auto",
     "&::-webkit-scrollbar": {
       display: "none",
@@ -27,12 +27,12 @@ const useStyle = makeStyles((theme) => ({
   },
 }));
 
-function DAOCard({ dao }) {
+function DAOCard({ dao, onClick }) {
   const cls = useStyle();
 
   return (
     // <Box className={cls.daoCard}>
-    <Button className={cls.daoCard} fullWidth>
+    <Button className={cls.daoCard} fullWidth onClick={onClick}>
       <Avatar src={dao.logoUrl} alt={"DAO Logo"} style={{ border: "0.2px solid lightgray" }} />
       <Box sx={{ minWidth: "1rem" }}></Box>
       <Typography>{dao.name}</Typography>
@@ -41,14 +41,18 @@ function DAOCard({ dao }) {
   );
 }
 
-function DAOList({ daos }) {
+function DAOList({ daos, onClick }) {
   const cls = useStyle();
+  function onCardClick(index) {
+    onClick(index);
+  }
+
   return (
     <Box className={cls.daoList}>
       {daos &&
         daos.map((e, i) => (
           <>
-            <DAOCard key={i} dao={e} />
+            <DAOCard key={i} dao={e} onClick={() => onCardClick(i)} />
             {i !== daos.length - 1 && <Divider />}
           </>
         ))}
@@ -56,31 +60,37 @@ function DAOList({ daos }) {
   );
 }
 
-export default function LatestCampaign({ daos }) {
+export default function LatestCampaign({ daos, fundingRound, selectedIndex = 0 }) {
   const cls = useStyle();
-  const [selectedDAO, setSelectedDAO] = useState(daos[0]);
+  const [selectedDAO, setSelectedDAO] = useState(daos[selectedIndex]);
 
   useEffect(() => {
-    if (!selectedDAO?.address) setSelectedDAO(daos[0]);
+    if (!selectedDAO?.address) setSelectedDAO(daos[selectedIndex]);
   }, [selectedDAO]);
 
   return (
-    <Grid className={cls.latestCampaign} container spacing={2}>
-      <Grid item md={4} xs={12} sx={{ height: "100%" }}>
-        <DAOInfo dao={selectedDAO} description={false} />
-      </Grid>
-      <Grid item md={8} xs={12}>
-        <Paper sx={{ witdh: "100%" }}>
-          <Grid container>
-            <Grid item md={5} xs={6}>
-              <DAOList daos={daos} />
+    <>
+      <Box mb={2}>
+        <Typography variant="h2">Latest Funding Round</Typography>
+      </Box>
+      <Grid className={cls.latestCampaign} container spacing={2}>
+        <Grid item md={4} xs={12} sx={{ height: "100%" }}>
+          <DAOInfo dao={selectedDAO} description={false} />
+        </Grid>
+        <Grid item md={8} xs={12}>
+          <Paper sx={{ witdh: "100%" }}>
+            <Grid container spacing={2}>
+              <Grid item md={5} xs={6}>
+                <DAOList daos={daos} onClick={(index) => setSelectedDAO(daos[index])} />
+              </Grid>
+              <Grid item md={7} xs={6}>
+                <Funding dao={selectedDAO} fundingRound={fundingRound} />
+              </Grid>
             </Grid>
-            <Grid item md={7} xs={6}>
-              <Funding />
-            </Grid>
-          </Grid>
-        </Paper>
+          </Paper>
+        </Grid>
       </Grid>
-    </Grid>
+    </>
+
   );
 }

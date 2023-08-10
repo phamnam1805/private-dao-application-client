@@ -19,10 +19,6 @@ export default class DAOContract {
     return await this.contract.methods.proposalCounter().call();
   }
 
-  async proposalIDs(index) {
-    return await this.contract.methods.proposalIDs(index).call();
-  }
-
   async proposals(proposalID) {
     return await this.contract.methods.proposals(proposalID).call();
   }
@@ -39,7 +35,35 @@ export default class DAOContract {
     return await this.contract.methods.requests(requestID).call();
   }
 
-  async createDAO(index, config, descriptionHash, accountAddress) {
-    return await this.contract.methods.createDAO(index, config, descriptionHash).send({ from: accountAddress });
+  async hashProposal(actions, descriptionHash) {
+    return await this.contract.methods.hashProposal(actions, descriptionHash).call();
+  }
+
+  async tally(proposalId, accountAddress) {
+    return await this.contract.methods.tally(proposalId).send({ from: accountAddress });
+  }
+
+  propose(actions, descriptionHash, accountAddress) {
+    return this.contract.methods.propose(actions, descriptionHash).send({ from: accountAddress });
+  }
+
+  castVote(proposalId, voteData, accountAddress) {
+    return this.contract.methods.castVote(proposalId, voteData).send({ from: accountAddress });
+  }
+
+  finalize(proposalId, accountAddress) {
+    return this.contract.methods.finalize(proposalId).send({ from: accountAddress });
+  }
+
+  queue(proposalId, accountAddress) {
+    return this.contract.methods.queue(proposalId).send({ from: accountAddress });
+  }
+
+  execute(proposalId, accountAddress) {
+    return this.contract.methods.execute(proposalId).send({ from: accountAddress });
+  }
+
+  cancel(proposalId, accountAddress) {
+    return this.contract.methods.cancel(proposalId).send({ from: accountAddress });
   }
 }

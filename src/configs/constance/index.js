@@ -44,6 +44,7 @@ export const BASE18 = BigNumber("1000000000000000000");
 export const BASE9 = BigNumber("1000000000");
 export const BASE8 = BigNumber("100000000");
 export const BASE6 = BigNumber("1000000");
+export const BASE_FUNDING = BigNumber("10000000000000000");
 
 export const BASE_E4 = 1e4;
 export const BASE_E6 = 1e6;
@@ -56,6 +57,7 @@ export const THEME_MODE = {
 };
 
 export const TX_FEE = "0.005";
+export const LOCAL_RPC = "https://thepao-node.auxo.fund";
 export const BACKEND_ROOT_URL = "https://thepao-server.auxo.fund";
 export const IPFS_GATEWAY = "https://the-pao.infura-ipfs.io/ipfs";
 export const IPFS_INFURA = "https://ipfs.infura.io:5001/api/v0";
@@ -63,6 +65,17 @@ export const IPFS_AUTH = "Basic " + btoa("2ShBHqwhCM8JAF1z9q26uXxdP0N" + ":" + "
 export const IPFS_HASHES = {
   DEFAULT_LOGO: "QmZQv8kYZuudFdczKSN16WvfYbszxFaoczSjVCew7HWFTj",
 };
+export const generateApplyFundingRoundProposal = (address) => ({
+  actions: [
+    {
+      target: address,
+      value: 0,
+      signature: "applyForFunding()",
+      data: "0x",
+    },
+  ],
+  descriptionHash: "0x" + [...Array(64)].map(() => Math.floor(Math.random() * 16).toString(16)).join(""),
+});
 
 export const LinkType = {
   NAV: "navLink",

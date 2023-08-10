@@ -13,46 +13,6 @@ const initialState = {
   daos: {},
 };
 
-// const mockDAOData = [
-//   {
-//     address: "0xD5745a490f14CdA24bed11156d91Eb7A77c8CB1B",
-//     status: "0",
-//     ipfs: {
-//       name: "The PAO",
-//       logoUrl:
-//         "https://lh3.googleusercontent.com/u/0/drive-viewer/AITFw-ww9lkjcQGAe9pBTgpxtKx0Af2mZsVDNDGM_PsAoBZHQifZ34fDGptTqex3-gPGxBCPXq11ZOp8rwK-Ncb1eD5CJhr3JQ=w3024-h1666",
-//       description:
-//         "The protocol addresses the privacy issue for investors, encompassing both the privacy of the amount of money they have invested and the privacy of voting on project operations through proposals.",
-//       website: "https://thepao.fund",
-//       tags: "Investment,Financial",
-//     },
-//   },
-//   {
-//     address: "0xD5745a490f14CdA24bed11156d91Eb7A77c8CB1B",
-//     status: "1",
-//     ipfs: {
-//       name: "Gitcoin",
-//       logoUrl: "https://user-images.githubusercontent.com/23297747/40148910-112c56d4-5936-11e8-95df-aa9796b33bf3.png",
-//       description:
-//         "Gitcoin's mission is to grow and sustain open source development. Gitcoin believes that open source software developers create billions of dollars in value, but don't get to capture that value.",
-//       website: "https://gitcoin.co",
-//       tags: "Investment,Public Goods",
-//     },
-//   },
-//   {
-//     address: "0xD5745a490f14CdA24bed11156d91Eb7A77c8CB1B",
-//     status: "2",
-//     ipfs: {
-//       name: "Openzeppelin",
-//       logoUrl: "https://avatars.githubusercontent.com/u/20820676?s=280&v=4",
-//       description:
-//         "OpenZeppelin provides security products to build, automate, and operate decentralized applications. We also protect leading organizations by performing security audits on their systems and products.",
-//       website: "https://www.openzeppelin.com",
-//       tags: "Programming,Security",
-//     },
-//   },
-// ];
-
 export const fetchDAOData = (enqueueSnackbar) => async (dispatch, getState) => {
   try {
     dispatch(fetchingDAOData());
@@ -60,15 +20,21 @@ export const fetchDAOData = (enqueueSnackbar) => async (dispatch, getState) => {
     const backendChainId = (await defaultClient.get("/")).data.chainID;
     if (Number(chainId) !== Number(backendChainId))
       throw Error(`Change to ${CHAIN_ALIASES[Number(backendChainId)].name || "unknown"} network!`);
-    let res = await defaultClient.post("/dao/all");
-    const daoList = res["data"];
-    const ipfsData = await Promise.all(daoList.map((dao) => ipfsQueryClient.get(`/${dao.ipfsHash || ""}`)));
-    daoList.map((dao, index) => {
-      Object.assign(dao, { ipfs: ipfsData[index] });
-      Object.assign(dao, { status: String(random(0, 2)) }); // FIXME
+    const res = await defaultClient.post("/dao/all");
+    const daoData = res["data"];
+    const ipfsData = await Promise.all(daoData.map((dao) => ipfsQueryClient.get(`/${dao.ipfsHash || ""}`)));
+    const daos = daoData.map((dao, index) => {
+      return {
+        name: ipfsData[index].name,
+        address: dao.daoAddress,
+        logoUrl: ipfsData[index].logoUrl,
+        description: ipfsData[index].description,
+        website: ipfsData[index].website,
+        tags: String(ipfsData[index].tags || "None").split(","),
+        totalFunded: Number(dao.totalFunded),
+      };
     });
-
-    dispatch(fetchDAODataSuccess({ daos: daoList }));
+    dispatch(fetchDAODataSuccess({ daos: daos }));
   } catch (error) {
     dispatch(fetchDAODataFail());
     console.error("DAOs data: ", error);
@@ -78,6 +44,56 @@ export const fetchDAOData = (enqueueSnackbar) => async (dispatch, getState) => {
 
 export const fetchParticularDAOData = (daoAddress, enqueueSnackbar) => async (dispatch, getState) => {
   const daos = getState().daoDataSlice.daos;
+  const daoExisted = Object.values(daos).filter(dao => dao.address.toLowerCase() == daoAddress.toLowerCase()).length > 0;
+  if (daoExisted) {
+    try {
+      dispatch(fetchingParticularDAOData());
+      const res = await defaultClient.post(`/dao/${daoAddress}/proposals`);
+      const proposalOverviewData = res["data"];
+      const proposalDetails = await Promise.all(proposalOverviewData.map(p => defaultClient.post(`/dao/${daoAddress}/proposals/${p.proposalID}`)));
+      // const [ipfsData, proposalDetails] = await Promise.all([
+      //   Promise.all(proposalOverviewData.map(p => ipfsQueryClient.get(`/${p.ipfsHash}`))),
+      //   Promise.all(proposalOverviewData.map(p => defaultClient.post(`/dao/${daoAddress}/proposals/${p.proposalID}`)))
+      // ]);
+      const proposals = proposalOverviewData.reduce((map, obj, idx) => {
+        map[obj.proposalID] = {
+          proposalID: obj.proposalID,
+          state: Number(obj.state),
+          ipfsHash: obj.ipfsHash,
+          descriptionHash: obj.descriptionHash,
+          title: "Test Proposal",
+          // title: ipfsData[idx].title ?? "Test Proposal",
+          // description: ipfsData[idx].description ?? "Unknown",
+          requestID: proposalDetails[idx].data.requestID,
+          requestState: Number(proposalDetails[idx].data.requestState),
+          distributedKey: proposalDetails[idx].data.distributedKey,
+          canceled: proposalDetails[idx].data.canceled,
+          executed: proposalDetails[idx].data.executed,
+          forVotes: proposalDetails[idx].data.forVotes,
+          againstVotes: proposalDetails[idx].data.againstVotes,
+          abstainVotes: proposalDetails[idx].data.abstainVotes,
+          startBlock: proposalDetails[idx].data.startBlock,
+          config: {
+            pendingPeriod: Number(proposalDetails[idx].data.daoConfig.pendingPeriod),
+            votingPeriod: Number(proposalDetails[idx].data.daoConfig.votingPeriod),
+            tallyingPeriod: Number(proposalDetails[idx].data.daoConfig.tallyingPeriod),
+            timelockPeriod: Number(proposalDetails[idx].data.daoConfig.timelockPeriod),
+            queuingPeriod: Number(proposalDetails[idx].data.daoConfig.queuingPeriod),
+          },
+        };
+        return map;
+      }, {});
+      const updatedDaos = daos.map(dao => (dao.address.toLowerCase() !== daoAddress.toLowerCase() ? dao : {
+        ...dao,
+        ...{ proposals: proposals }
+      }));
+      dispatch(fetchParticularDAODataSuccess({ daos: updatedDaos }));
+    } catch (error) {
+      dispatch(fetchParticularDAODataFail());
+      console.error("DAOs data: ", error);
+      errorNotify(enqueueSnackbar, JSON.stringify(error.message));
+    }
+  }
 
 };
 
@@ -91,7 +107,7 @@ const daoDataSlice = createSlice({
     fetchDAODataSuccess: (state, action) => {
       state.daos = action.payload.daos;
       state.fetchingDAOsStatus = QUERY_STATE.SUCCESS;
-      state.fetchingParticularDAOStatus = QUERY_STATE.SUCCESS;
+      // state.fetchingParticularDAOStatus = QUERY_STATE.SUCCESS;
     },
     fetchDAODataFail: (state) => {
       state.fetchingDAOsStatus = QUERY_STATE.FAIL;
@@ -100,6 +116,7 @@ const daoDataSlice = createSlice({
       state.fetchingParticularDAOStatus = QUERY_STATE.FETCHING;
     },
     fetchParticularDAODataSuccess: (state, action) => {
+      state.daos = action.payload.daos;
       state.fetchingParticularDAOStatus = QUERY_STATE.SUCCESS;
     },
     fetchParticularDAODataFail: (state) => {

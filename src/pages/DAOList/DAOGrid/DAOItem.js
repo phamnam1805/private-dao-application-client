@@ -1,6 +1,7 @@
 import { useHistory } from "react-router-dom";
 import { Box, Button, Typography, makeStyles } from "@material-ui/core";
 // import { Skeleton } from "@material-ui/lab";
+import Web3 from "web3";
 import CopyIcon from "src/components/Icon/CopyIcon";
 import { formatAddress } from "src/services/utility";
 
@@ -41,16 +42,18 @@ export default function DAOItem({ dao }) {
   const cls = useStyle();
   const history = useHistory();
 
-  const status = (() => {
-    switch (dao.status) {
-      case "0":
+  const status = () => {
+    switch (dao.state) {
+      case 0:
         return { text: "Not raising fund", className: cls.standby };
-      case "1":
+      case 1:
         return { text: "Queued for next round", className: cls.queued };
-      case "2":
+      case 2:
         return { text: "Fund the project", className: cls.active };
+      default:
+        return { text: "No funding information", className: cls.standby };
     }
-  })();
+  };
 
   return (
     <Box flexGrow={1} className={cls.daoBox}>
@@ -89,6 +92,12 @@ export default function DAOItem({ dao }) {
         </Box>
         <Box className={cls.content}>
           <Typography color="textSecondary" gutterBottom>
+            Total Funded
+          </Typography>
+          <Typography>{Web3.utils.fromWei(String(dao.totalFunded))} ETH</Typography>
+        </Box>
+        <Box className={cls.content}>
+          <Typography color="textSecondary" gutterBottom>
             Tags
           </Typography>
           <Box className={cls.tag}>
@@ -102,7 +111,6 @@ export default function DAOItem({ dao }) {
             })}
           </Box>
         </Box>
-
         <Box className={cls.content}>
           <Typography color="textSecondary" gutterBottom>
             Website
@@ -115,15 +123,19 @@ export default function DAOItem({ dao }) {
           }}
         />
         <Box className={cls.content}>
-          <Button disabled={dao.status.toString() == "2" ? false : true} fullWidth={true} className={status.className}>
-            {status.text}
+          <Button
+            fullWidth={true} className={status().className}
+            disabled={dao.state == 2 ? false : true}
+            onClick={() => { history.push(`/investment-dashboard?addr=${dao.address.toLowerCase()}`) }}
+          >
+            {status().text}
           </Button>
           <Box
             sx={{
               minWidth: "0.5rem",
             }}
           />
-          <Button color="primary" variant="outlined" onClick={() => history.push(`/daos/${dao.address}`)}>
+          <Button color="primary" variant="outlined" onClick={() => history.push(`/daos/${dao.address.toLowerCase()}`)}>
             Details
           </Button>
         </Box>

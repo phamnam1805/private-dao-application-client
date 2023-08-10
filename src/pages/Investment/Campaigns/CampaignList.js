@@ -20,7 +20,7 @@ const useStyle = makeStyles((theme) => ({}));
 export default function CampaignList({ campaigns }) {
   return (
     <div>
-      {campaigns.map((e, i) => (
+      {[...campaigns].reverse().map((e, i) => (
         <CampaignItem key={i} campaign={e} />
       ))}
     </div>

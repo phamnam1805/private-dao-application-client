@@ -11,12 +11,15 @@ import {
   Typography,
   withStyles,
 } from "@material-ui/core";
+import { useSnackbar } from "notistack";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import ArrowAnimationIcon from "src/components/Icon/ArrowAnimationIcon";
 import CopyIcon from "src/components/Icon/CopyIcon";
 import Empty from "src/components/Icon/Empty";
 import { THEME_MODE } from "src/configs/constance";
 import { formatAddress } from "src/services/utility";
+import Web3 from "web3";
 
 const CssBox = withStyles((theme) => ({
   root: {
@@ -58,45 +61,27 @@ const useStyle = makeStyles((theme) => ({
   },
 }));
 
-export default function VotingItem() {
+export default function VotingItem({ notes, onVote, checkVoted, disabledAll }) {
   const cls = useStyle();
   const rootRef = useRef(null);
-  const notes = [
-    {
-      id: "0",
-      dao: "0x52567d79610A91dCd3bC32F5550118E40b22781F",
-      amount: 1000,
-      nullifier: "0x1234567812345678123456781234567812345678123456781234567812345678",
-      commitment: "0x1234567812345678123456781234567812345678123456781234567812345678",
-      createdAt: 1689689327000,
-    },
-    {
-      id: "1",
-      dao: "0x52567d79610A91dCd3bC32F5550118E40b22781F",
-      amount: 2000,
-      nullifier: "0x1234567812345678123456781234567812345678123456781234567812345678",
-      commitment: "0x1234567812345678123456781234567812345678123456781234567812345678",
-      createdAt: 1689689327000,
-    },
-  ];
-  const defaultSelectedCommitment = notes[0] || null;
-  const [selectedCommitment, setSelectedCommitment] = useState(defaultSelectedCommitment);
+  const defaultSelectedNote = notes[0] || null;
+  const [selectedNote, setSelectedNote] = useState(defaultSelectedNote);
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
   const id = open ? "commitments-popover" : undefined;
 
   useEffect(() => {
-    if (!selectedCommitment?.commitment) setSelectedCommitment(defaultSelectedCommitment);
-  }, [selectedCommitment]);
+    if (!selectedNote?.nullifier) setSelectedNote(defaultSelectedNote);
+  }, [selectedNote]);
 
   const rootWidth = useMemo(() => {
     if (rootRef?.current) return rootRef.current.offsetWidth;
     else return "auto";
   }, [rootRef?.current?.offsetWidth]);
 
-  function onChooseCommitment(e, selectedCommitment) {
-    setSelectedCommitment(selectedCommitment);
-    if (event?.onChooseItem) event.onChooseCommitment(e, selectedCommitment);
+  function onChooseNote(e, selectedNote) {
+    setSelectedNote(selectedNote);
+    if (event?.onChooseItem) event.onChooseNote(e, selectedNote);
     setAnchorEl(null);
   }
 
@@ -117,21 +102,27 @@ export default function VotingItem() {
               </Box>
               <Box className={cls.content}>
                 <Typography color="textSecondary" gutterBottom>
-                  ID
+                  Name
                 </Typography>
-                <Typography>Commitment #{selectedCommitment.id}</Typography>
+                <Typography>{selectedNote.name ?? "Untitled note"}</Typography>
               </Box>
               <Box className={cls.content}>
                 <Typography color="textSecondary" gutterBottom>
                   Amount
                 </Typography>
-                <Typography>{selectedCommitment.amount} ETH</Typography>
+                <Typography>{Web3.utils.fromWei(selectedNote.amount)} ETH</Typography>
               </Box>
               <Box className={cls.content}>
                 <Typography color="textSecondary" gutterBottom>
                   Created At
                 </Typography>
-                <Typography>{new Date(1689689327000).toString().slice(4, 15)}</Typography>
+                <Typography>{new Date(selectedNote.timestamp).toDateString()}</Typography>
+              </Box>
+              <Box className={cls.content}>
+                <Typography color="textSecondary" gutterBottom>
+                  Voted
+                </Typography>
+                <Typography>{checkVoted(selectedNote) ? "Yes" : "No"}</Typography>
               </Box>
             </Box>
           </Grid>
@@ -141,9 +132,9 @@ export default function VotingItem() {
                 Cast your Vote
               </Typography>
             </Box>
-            <Box className={cls.content} mb={2}>
+            <Box className={cls.content} mb={2.5}>
               <CssBox ref={rootRef} onClick={(event) => setAnchorEl(event.currentTarget)}>
-                <Typography className={cls.text}>{formatAddress(selectedCommitment.commitment, 8)}</Typography>
+                <Typography className={cls.text}>{formatAddress(String(selectedNote.commitment), 8)}</Typography>
                 <ArrowAnimationIcon
                   className={cls.text}
                   fontSize="small"
@@ -164,10 +155,10 @@ export default function VotingItem() {
                       <ListItem
                         key={item.id}
                         button
-                        onClick={(event) => onChooseCommitment(event, item)}
+                        onClick={(event) => onChooseNote(event, item)}
                         style={{ borderRadius: "6px" }}
                       >
-                        {formatAddress(item.commitment, 8)}
+                        {formatAddress(String(item.commitment), 8)}
                       </ListItem>
                     );
                   })}
@@ -175,23 +166,27 @@ export default function VotingItem() {
               </Popover>
             </Box>
             <Box className={cls.content}>
-              <Button variant="contained" color="primary" fullWidth={true}>
+              <Button
+                variant="contained" color="primary" fullWidth={true}
+                onClick={() => onVote(selectedNote, 1)}
+                disabled={checkVoted(selectedNote) || disabledAll}
+              >
                 YAY
               </Button>
-              <Box
-                sx={{
-                  minWidth: "0.5rem",
-                }}
-              />
-              <Button variant="contained" color="secondary" fullWidth={true}>
+              <Box sx={{ minWidth: "0.5rem" }} />
+              <Button
+                variant="contained" color="secondary" fullWidth={true}
+                onClick={() => onVote(selectedNote, 0)}
+                disabled={checkVoted(selectedNote) || disabledAll}
+              >
                 NAY
               </Button>
-              <Box
-                sx={{
-                  minWidth: "0.5rem",
-                }}
-              />
-              <Button variant="outlined" fullWidth={true}>
+              <Box sx={{ minWidth: "0.5rem" }} />
+              <Button
+                variant="contained" fullWidth={true}
+                onClick={() => onVote(selectedNote, 2)}
+                disabled={checkVoted(selectedNote) || disabledAll}
+              >
                 ABSTAIN
               </Button>
             </Box>

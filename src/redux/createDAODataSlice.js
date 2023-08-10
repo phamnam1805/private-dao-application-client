@@ -12,7 +12,7 @@ export const DEFAULT_VALUE = {
   VOTING_PERIOD: 100,
   TALLYING_PERIOD: 40,
   TIMELOCK_PERIOD: 10,
-  QUEUING_PERIOD: 10,
+  QUEUING_PERIOD: 50,
 };
 
 const initialState = {

@@ -13,11 +13,13 @@ import {
   useTheme,
 } from "@material-ui/core";
 import { useState } from "react";
+import { FUNDING_STATE_ALIAS } from "src/configs/constance";
 import ArrowAnimationIcon from "src/components/Icon/ArrowAnimationIcon";
-import StatusChip from "./StatusChip";
+import StatusChip from "../components/StatusChip";
 import CopyIcon from "src/components/Icon/CopyIcon";
 import Empty from "src/components/Icon/Empty";
 import { formatAddress } from "src/services/utility";
+import { web3Reader } from "src/wallet-connection";
 
 const useStyle = makeStyles((theme) => ({
   campaignBox: {
@@ -81,7 +83,7 @@ function FundingResult({ daos, result, ...props }) {
             />
           </Grid>
           <Grid item xs={6}>
-            {result[i]}
+            {`${web3Reader.utils.fromWei(String(result[i]))} ETH`}
           </Grid>
         </>
       ))}
@@ -100,17 +102,17 @@ export default function CampaignItem({ campaign, ...props }) {
 
   return (
     <div>
-      <Box {...props}>
+      <Box {...props} mb={2}>
         <Box className={cls.campaignBox}>
           <Grid container>
             <Grid item md={5} sm={12} container spacing={1}>
               <Grid item xs={12}>
                 <Box className={cls.imageBox}>
-                  <Typography variant="h5">{`Funding Round ${campaign.id}`}</Typography>
+                  <Typography variant="h5">{`Funding Round ${campaign.fundingRoundId}`}</Typography>
                 </Box>
               </Grid>
               <Grid item xs={12} md={6}>
-                <StatusChip status={"Succeeded"} />
+                <StatusChip status={FUNDING_STATE_ALIAS[campaign.state]} />
               </Grid>
               <Grid item xs={12} md={6}></Grid>
             </Grid>
@@ -123,11 +125,7 @@ export default function CampaignItem({ campaign, ...props }) {
               <Grid item xs={12}>
                 <Box className={cls.imageBox}>
                   <Typography>
-                    {
-                      30000
-                      // campaign.totalFunded
-                    }{" "}
-                    ETH
+                    {`${web3Reader.utils.fromWei(String(campaign.totalFunded))} ETH`}
                   </Typography>
                 </Box>
               </Grid>
@@ -141,10 +139,7 @@ export default function CampaignItem({ campaign, ...props }) {
               <Grid item xs={12}>
                 <Box className={cls.imageBox}>
                   <Typography>
-                    {
-                      15
-                      // campaign.listDAO.length || 0
-                    }
+                    {campaign.listDAO.length || 0}
                   </Typography>
                 </Box>
               </Grid>

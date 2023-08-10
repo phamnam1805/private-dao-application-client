@@ -1,6 +1,9 @@
 import {
   Box,
   Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Table,
   TableBody,
   TableContainer,
@@ -16,21 +19,113 @@ import { useDispatch, useSelector } from "react-redux";
 import useNotify from "src/hook/useNotify";
 import DKGContract from "src/contract/DKGContract";
 import { web3Reader, web3Sender } from "src/wallet-connection";
-import { QUERY_STATE, KEY_STATE, KEY_STATE_ALIAS, KEY_TYPE_ALIAS } from "src/configs/constance";
-import { fetchAccountData, readContributionData, removeContributionData, saveContributionData } from "src/redux/accountDataSlice";
+import { KEY_STATE, KEY_STATE_ALIAS, KEY_TYPE_ALIAS, THEME_MODE } from "src/configs/constance";
+import { fetchAccountData, saveContributionData } from "src/redux/accountDataSlice";
 import { fetchKeysData } from "src/redux/dkgDataSlice";
-import { formatAddress } from "src/services/utility";
+import { formatAddress, parseBigIntObject } from "src/services/utility";
 import CopyIcon from "src/components/Icon/CopyIcon";
 import Empty from "src/components/Icon/Empty";
+import { LoadingIconBox } from "src/components/Icon/LoadingIcon";
 import { generateRound1Contribution, generateRound2Contribution } from "../Contributions";
-import { parseBigIntObject } from "src/services/utility";
 
-const useStyle = makeStyles((theme) => ({}));
+const useStyle = makeStyles((theme) => ({
+  title: {
+    padding: "10px 20px 10px 20px",
+    background: theme.palette.type === THEME_MODE.DARK ? "#4D2900" : "#F2F5F2",
+  },
+  listItem: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    padding: theme.spacing(2),
+    borderRadius: 10,
+  },
+  image: {
+    height: 60,
+    width: 60,
+    objectFit: "contain",
+  },
+  chooseText: {
+    color: theme.palette.text.hint,
+    padding: "0rem 0rem 0.5rem 0rem",
+  },
+}));
+
+function ContributionModalDialog({ open, onClose }) {
+  const cls = useStyle();
+  return (
+    <Dialog open={open} onClose={onClose} PaperProps={{ style: { padding: 0, maxWidth: 400 } }}>
+      <DialogTitle className={cls.title}>
+        <Box textAlign="center">
+          <Typography variant="h4" className={cls.chooseText}>
+            Key Generation Contribution
+          </Typography>
+        </Box>
+      </DialogTitle>
+      <DialogContent>
+        <Box mt={2}>
+          <LoadingIconBox />
+        </Box>
+        <Box mt={2}>
+          <Typography align="center" color="textSecondary" style={{ fontSize: "14px", fontWeight: "400" }}>
+            Submitting Contribution
+          </Typography>
+        </Box>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PublicKeyModalDialog({ open, onClose, pubKeyX, pubKeyY }) {
+  const cls = useStyle();
+  return (
+    <Dialog open={open} onClose={onClose} PaperProps={{ style: { padding: 0, maxWidth: 400 } }}>
+      <DialogTitle className={cls.title}>
+        <Box textAlign="center">
+          <Typography variant="h4" className={cls.chooseText}>
+            Public Key
+          </Typography>
+        </Box>
+      </DialogTitle>
+      <DialogContent>
+        <Box mt={2} sx={{ display: "flex", width: "100%" }}>
+          <Typography color="textPrimary" style={{ fontSize: "14px", fontWeight: "400" }}>
+            {"X:"}
+          </Typography>
+          <Typography color="textSecondary" style={{
+            width: "100%",
+            fontSize: "14px",
+            fontWeight: "400",
+            wordWrap: "break-word"
+          }}>
+            {pubKeyX}
+          </Typography>
+        </Box>
+        <Box mt={2} sx={{ display: "flex" }}>
+          <Typography color="textPrimary" style={{ fontSize: "14px", fontWeight: "400" }}>
+            {"Y:"}
+          </Typography>
+          <Typography color="textSecondary" style={{
+            width: "100%",
+            fontSize: "14px",
+            fontWeight: "400",
+            wordWrap: "break-word"
+          }}>
+            {pubKeyY}
+          </Typography>
+        </Box>
+        <Box ml={-1}>
+          <CopyIcon copyText={`[${pubKeyX},${pubKeyY}]`} defaultText="Copy public key" successText="Copied public key!" size="small" />
+        </Box>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function KeyTableHeader() {
   const cls = useStyle();
   const columns = [
-    { id: "keyID", label: "Key ID", classes: cls.cell, style: { minWidth: 60, maxWidth: 70 } },
+    { id: "keyID", label: "ID", classes: cls.cell, style: { minWidth: 60, maxWidth: 70 } },
     { id: "dimension", label: "Dimension", classes: cls.cell, style: { minWidth: 60, maxWidth: 70 } },
     { id: "type", label: "Type", classes: cls.firstCell, style: { minWidth: 100, maxWidth: 120 } },
     { id: "state", label: "Status", classes: cls.cell, style: { minWidth: 100, maxWidth: 120 } },
@@ -57,24 +152,24 @@ function KeyTableHeader() {
 }
 
 function KeyTableRow({ dKey }) {
-  const cls = useStyle();
   const dispatch = useDispatch();
   const { errorNotify } = useNotify();
   const { enqueueSnackbar } = useSnackbar();
   const { accountAddress } = useSelector((state) => state.accountDataSlice);
   const { chainId, addresses } = useSelector((state) => state.configSlice);
   const { DKG } = addresses;
+  const [isOpenContributionModal, setIsOpenContributionModal] = useState(false);
+  const [isOpenPublicKeyModal, setIsOpenPublicKeyModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
   async function onRowClick() { }
-  console.log("Key API:", dKey);
 
   async function onContributionClick() {
-    console.log(`Start Contribution Round ${dKey.state + 1}`);
+    setIsLoading(true);
     // Open modal
     const dkgReader = new DKGContract(web3Reader, DKG);
     const dkgSender = new DKGContract(web3Sender, DKG);
     const keyData = await dkgReader.distributedKeys(dKey.keyID);
-    console.log("Previous", keyData);
     let committeeData, contribution, _promise;
     if (dKey.state == KEY_STATE.CONTRIBUTION_ROUND_1) {
       // eslint-disable-next-line no-constant-condition
@@ -91,10 +186,9 @@ function KeyTableRow({ dKey }) {
         accountAddress
       );
     } else if (dKey.state == KEY_STATE.CONTRIBUTION_ROUND_2) {
-      console.log("round2");
       // eslint-disable-next-line no-constant-condition
       if (true) {
-        const generatedData = generateRound2Contribution(
+        const generatedData = await generateRound2Contribution(
           parseBigIntObject(dKey.contributions),
           dKey.round1DataSubmissions
         );
@@ -103,13 +197,14 @@ function KeyTableRow({ dKey }) {
       } else {
         // Upload data
       }
+      _promise = dkgSender.submitRound2Contribution(
+        dKey.keyID,
+        contribution,
+        accountAddress
+      );
     }
-
-    console.log(committeeData, contribution);
-
     // On transactionHash
     _promise.on("transactionHash", (_) => {
-      setIsLoading(true);
     });
     // Then
     _promise.then(async (receipt) => {
@@ -117,20 +212,19 @@ function KeyTableRow({ dKey }) {
       dispatch(fetchKeysData(enqueueSnackbar));
       dispatch(fetchAccountData(accountAddress, enqueueSnackbar));
       setIsLoading(false);
-      const keyData = await dkgReader.distributedKeys(dKey.keyID);
-      console.log("After", keyData);
     });
     // Catch
     _promise.catch(async (error) => {
       errorNotify(JSON.stringify(error.message));
       setIsLoading(false);
     });
+
     // Close modal
 
   }
 
   async function onPublicKeyClick() {
-    console.log("This is public key!");
+    setIsOpenPublicKeyModal(true);
   }
 
   return (
@@ -168,11 +262,15 @@ function KeyTableRow({ dKey }) {
               variant="outlined" color={"primary"} fullWidth
               onClick={onContributionClick}
               disabled={
+                isLoading ||
                 (dKey.contributions !== undefined && dKey.state == KEY_STATE.CONTRIBUTION_ROUND_1) ||
                 (dKey.contributions !== undefined && (parseBigIntObject(dKey.contributions).ciphers !== undefined) && dKey.state == KEY_STATE.CONTRIBUTION_ROUND_2)
               }
             >
-              {!(dKey.contributions !== undefined) ? "Submit Contribution Round 1" : ((parseBigIntObject(dKey.contributions).ciphers !== undefined) ? "Finished Contribution" : "Submit Contribution Round 2")}
+              {isLoading && <LoadingIconBox iconProps={{ sx: { height: 25 } }} />}
+              {!isLoading &&
+                (!(dKey.contributions !== undefined) ? "Submit Contribution Round 1" : ((parseBigIntObject(dKey.contributions).ciphers !== undefined) ? "Finished Contribution" : "Submit Contribution Round 2"))
+              }
             </Button>
           </Box>
         )}
@@ -190,6 +288,7 @@ function KeyTableRow({ dKey }) {
           </Button>
         </Box>
       </TableCell>
+      <PublicKeyModalDialog open={isOpenPublicKeyModal} onClose={() => setIsOpenPublicKeyModal(false)} pubKeyX={dKey.publicKey[0]} pubKeyY={dKey.publicKey[1]} />
     </TableRow>
   );
 }
@@ -197,18 +296,19 @@ function KeyTableRow({ dKey }) {
 export default function KeyTable({ keyListData }) {
   return (
     <Box>
-      {keyListData.length > 0 ? (
-        <TableContainer style={{ marginTop: 2, borderRadius: "10px" }}>
-          <Table>
-            <KeyTableHeader />
+      <TableContainer style={{ marginTop: 2, borderRadius: "10px" }}>
+        <Table>
+          <KeyTableHeader />
+          {keyListData.length > 0 && (
             <TableBody>
               {[...keyListData].reverse().map((dKeyData, index) => {
                 return <KeyTableRow key={index} dKey={dKeyData} />;
               })}
             </TableBody>
-          </Table>
-        </TableContainer>
-      ) : (
+          )}
+        </Table>
+      </TableContainer>
+      {(keyListData.length == 0) && (
         <Box py={2} display="flex" justifyContent="center">
           <Empty title="No Data" iconProps={{ style: { fontSize: "60px" } }} />
         </Box>

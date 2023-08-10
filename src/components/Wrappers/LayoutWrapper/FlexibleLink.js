@@ -103,8 +103,8 @@ export function DesktopList({ element }) {
   const location = useLocation();
 
   return (
-    <Link
-      href={element.to}
+    <NavLink
+      to={element.to}
       className={cls.baseLink}
       style={{ textDecoration: "none", padding: "0.5rem 0.5rem 0rem 0.5rem", borderRadius: "3px" }}
     >
@@ -119,6 +119,6 @@ export function DesktopList({ element }) {
           {element.label}
         </Typography>
       </Box>
-    </Link>
+    </NavLink>
   );
 }

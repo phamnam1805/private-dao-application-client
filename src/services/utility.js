@@ -1,5 +1,5 @@
 import { CHAIN_ALIASES } from "src/configs/connection-config";
-import { ASSET_UNIT, LS, NETWORK } from "src/configs/constance";
+import { LOCAL_RPC, LS, NETWORK } from "src/configs/constance";
 import { web3Sender } from "src/wallet-connection";
 import Web3 from "web3";
 import JSONBig from "json-bigint";
@@ -166,4 +166,39 @@ export function parseBigIntObject(str) {
 
 export function stringifyBigIntObject(obj) {
   return JSONBig({ useNativeBigInt: true }).stringify(obj);
+}
+
+export async function getBlockNumber(web3) {
+  return await web3.eth.getBlockNumber();
+}
+
+export async function mineBlocks(numBlocks, log = false) {
+  const web3 = new Web3(LOCAL_RPC);
+  const before = await getBlockNumber(web3);
+
+  if (log) {
+    console.log("Before:", before);
+    console.log(`Mining ${numBlocks} block(s)...`);
+  }
+
+  await Promise.all(
+    [...Array(numBlocks).keys()].map(e => web3._provider.send({
+      jsonrpc: "2.0",
+      method: "evm_mine",
+      params: [],
+      id: 0,
+    }, (err, res) => {
+      if (err) throw err;
+      else {
+        console.log(res);
+      }
+    }))
+  );
+
+  const after = await getBlockNumber(web3);
+
+  if (log) {
+    console.log("After:", after);
+    console.log(`Mined ${after - before} block(s)...`);
+  }
 }

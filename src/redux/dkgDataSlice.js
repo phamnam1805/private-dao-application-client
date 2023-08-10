@@ -3,12 +3,12 @@ import { QUERY_STATE } from "src/configs/constance";
 import { CHAIN_ALIASES } from "src/configs/connection-config";
 import { errorNotify } from "src/hook/useNotify";
 import { defaultClient } from "src/services/requestClient";
-import { parseBigIntObject, stringifyBigIntObject } from "src/services/utility";
 
 const initialState = {
   fetchingKeysStatus: QUERY_STATE.INITIAL,
   fetchingParticularKeyStatus: QUERY_STATE.INITIAL,
   keys: {},
+  requests: {},
 };
 
 export const fetchKeysData = (enqueueSnackbar) => async (dispatch, getState) => {
@@ -18,9 +18,31 @@ export const fetchKeysData = (enqueueSnackbar) => async (dispatch, getState) => 
     const backendChainId = (await defaultClient.get("/")).data.chainID;
     if (Number(chainId) !== Number(backendChainId))
       throw Error(`Change to ${CHAIN_ALIASES[Number(backendChainId)]?.name || "unknown"} network!`);
-    let res = await defaultClient.post("/committee/distributed-keys");
-    const keyList = res["data"];
-    const keys = keyList.map((key, index) => ({
+
+    let [resKey, resRequest] = await Promise.all([
+      defaultClient.post("/committee/distributed-keys"),
+      defaultClient.post("/committee/distributed-key-requests")
+    ]);
+
+    const requestList = resRequest["data"];
+    const requests = requestList.reduce((reqs, req) => {
+      reqs[req.requestID] = {
+        requestID: req.requestID,
+        state: Number(req.state),
+        requester: req.requester,
+        keyID: Number(req.distributedKeyID),
+        R: req.r,
+        M: req.m,
+        tallyCounter: Number(req.tallyCounter),
+        resultSubmitted: req.resultSubmitted,
+        tallyDataSubmissions: req.tallyDataSubmissions,
+        resultVector: req.resultVector,
+      };
+      return reqs;
+    }, {});
+
+    const keyList = resKey["data"];
+    const keys = keyList.map((key) => ({
       keyID: Number(key.distributedKeyID),
       dimension: Number(key.dimension),
       type: Number(key.distributedKeyType),
@@ -30,7 +52,8 @@ export const fetchKeysData = (enqueueSnackbar) => async (dispatch, getState) => 
       round1DataSubmissions: key.round1DataSubmissions,
       round2DataSubmissions: key.round2DataSubmissions,
     }));
-    dispatch(fetchKeysDataSuccess({ keys: keys }));
+
+    dispatch(fetchKeysDataSuccess({ keys: keys, requests: requests }));
   } catch (error) {
     dispatch(fetchKeysDataFail());
     console.error("Keys data: ", error);
@@ -51,6 +74,7 @@ const dkgDataSlice = createSlice({
     },
     fetchKeysDataSuccess: (state, action) => {
       state.keys = action.payload.keys;
+      state.requests = action.payload.requests;
       state.fetchingKeysStatus = QUERY_STATE.SUCCESS;
       // state.fetchingParticularKeyStatus = QUERY_STATE.SUCCESS;
     },
@@ -60,7 +84,7 @@ const dkgDataSlice = createSlice({
     fetchingParticularKeyData: (state) => {
       state.fetchingParticularKeyStatus = QUERY_STATE.FETCHING;
     },
-    fetchParticularKeyDataSuccess: (state, action) => {
+    fetchParticularKeyDataSuccess: (state) => {
       state.fetchingParticularKeyStatus = QUERY_STATE.SUCCESS;
     },
     fetchParticularKeyDataFail: (state) => {

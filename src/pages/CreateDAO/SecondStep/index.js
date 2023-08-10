@@ -1,9 +1,11 @@
 import { Box, makeStyles, Typography } from "@material-ui/core";
+import { useSnackbar } from "notistack";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useHistory } from "react-router-dom";
 import DAOManagerContract from "src/contract/DAOManagerContract";
 import useNotify from "src/hook/useNotify";
+import { fetchDAOData } from "src/redux/daoDataSlice";
 import { DEFAULT_VALUE, StepStatus, updateCreateDAOData, resetCreateDAOData } from "src/redux/createDAODataSlice";
 import { web3Reader, web3Sender } from "src/wallet-connection";
 import BaseStep from "../components/BaseStep";
@@ -27,12 +29,13 @@ export default function SecondStep({ ...props }) {
   const dispatch = useDispatch();
   const history = useHistory();
   const mounted = useRef(false);
+  const { enqueueSnackbar } = useSnackbar();
   const { errorNotify } = useNotify();
   const [isLoading, setIsLoading] = useState(false);
   const { accountAddress } = useSelector((state) => state.accountDataSlice);
   const { activeStep, activeStatus, descriptionHash } = useSelector((state) => state.createDAODataSlice);
-  const { chainId, addresses } = useSelector((state) => state.configSlice);
-  const { DAO_MANAGER, DAOS } = addresses;
+  const { addresses } = useSelector((state) => state.configSlice);
+  const { DAO_MANAGER } = addresses;
 
   const disableAll = !(activeStep == 1);
 
@@ -117,6 +120,7 @@ export default function SecondStep({ ...props }) {
         })
       );
       dispatch(resetCreateDAOData());
+      dispatch(fetchDAOData(enqueueSnackbar));
       setIsLoading(false);
       history.push("/daos");
     });

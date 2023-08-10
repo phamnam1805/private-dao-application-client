@@ -19,8 +19,8 @@ export default class DKGContract {
     return await this.contract.methods.tallyTrackers(requestID).call();
   }
 
-  async generateDistributedKey(dimension, distributedKeyType, accountAddress) {
-    return await this.contract.methods
+  generateDistributedKey(dimension, distributedKeyType, accountAddress) {
+    return this.contract.methods
       .generateDistributedKey(dimension, distributedKeyType)
       .send({ from: accountAddress });
   }
